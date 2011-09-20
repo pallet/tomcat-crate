@@ -1,5 +1,7 @@
 # Release notes
 
+## tomcat-0.6.1
+
 - Relax check on call of tomcat/server as crate function
   The check was triggered by calling server with no direct options
 
@@ -9,10 +11,9 @@
 
 - Update crates for pallet 0.6.3
 
-- Add explicit deploy-dir to comcat crate
+- Add explicit deploy-dir to tomcat crate
 
 - Enable use of multiple tomcat instances
-
 
 ## tomcat-0.6.0
 
@@ -26,7 +27,7 @@
 - Update tomcat for separate settings-map
 
 - Add a settings phase for the Tomcat crate.
-  Adding new function settings to load the session with the values that 
+  Adding new function settings to load the session with the values that
   install normally does. Install function now calls settings at the
   beginning to load the settings. Tests pass.
 
@@ -54,7 +55,7 @@
   root:root.
 
 - Update java, tomcat, and maven to use jpackage-utils-compat
-  Update java based crates to use the updated jpackage functions in 
+  Update java based crates to use the updated jpackage functions in
   pallet.resource.package, based on the jpackage-utils-compat rpm
 
 - Fix the script that checks the tomcat install directory exists
@@ -63,7 +64,7 @@
 
 - Update for 0.5.0-SNAPSHOT
   Change pallet.resource.* to pallet.action.*. Change stevedore calls to
-  script functions to use unquote and the pallet.script.lib namespace. 
+  script functions to use unquote and the pallet.script.lib namespace.
   Change request to session.  Change build-resources to build-actions.
 
 
