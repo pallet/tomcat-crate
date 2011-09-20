@@ -21,6 +21,7 @@
     [pallet.parameter :as parameter]
     [pallet.parameter-test :as parameter-test]
     [pallet.phase :as phase]
+    [pallet.script.lib :as lib]
     [pallet.session :as session]
     [pallet.stevedore :as stevedore]
     [pallet.thread-expr :as thread-expr])
@@ -28,7 +29,7 @@
    clojure.test
    pallet.test-utils))
 
-(use-fixtures :once with-ubuntu-script-template)
+(use-fixtures :once with-ubuntu-script-template with-bash-script-language)
 
 (deftest install-test
   (is (= (first
@@ -37,7 +38,7 @@
            (package/package-manager :update)
            (package/package "tomcat6")
            (directory/directory
-            (stevedore/script (user-home "tomcat6"))
+            (stevedore/script (~lib/user-home "tomcat6"))
             :owner "tomcat6" :group "tomcat6" :mode "0755")
            (exec-script/exec-checked-script
             "Check tomcat is at /var/lib/tomcat6/"
@@ -51,7 +52,7 @@
            (tomcat/settings {})
            (tomcat/install)
            (parameter-test/parameters-test
-            [:host :id :tomcat :base] "/var/lib/tomcat6/"))))))
+            [:host :id :tomcat :default :base] "/var/lib/tomcat6/"))))))
 
 (deftest classname-for-test
   (let [m {:a "a" :b "b"}]
@@ -63,19 +64,24 @@
   (is (= (first
           (build-actions/build-actions
            {}
-           (remote-file/remote-file "/p/webapps/ROOT.war"
+           (remote-file/remote-file
+            "/p/webapps/ROOT.war"
             :remote-file "file.war" :owner "o" :group "g" :mode "600")))
          (first
           (build-actions/build-actions
            {:parameters
-            {:host {:id {:tomcat {:base "/p/" :owner "o" :group "g"}}}}}
-          (tomcat/deploy nil :remote-file "file.war"))))))
+            {:host {:id {:tomcat
+                         {:default {:base "/p/" :deploy "/p/webapps"
+                                    :owner "o" :group "g"}}}}}}
+           (tomcat/deploy nil :remote-file "file.war"))))))
 
 (deftest tomcat-undeploy-all-test
   (is (= "rm -r -f /p/webapps/*\n"
          (first
           (build-actions/build-actions
-           {:parameters {:host {:id {:tomcat {:base "/p/"}}}}}
+           {:parameters
+            {:host {:id {:tomcat {:default
+                                  {:base "/p/" :webapps "/p/webapps"}}}}}}
            (tomcat/undeploy-all))))))
 
 (deftest tomcat-undeploy-test
@@ -83,20 +89,35 @@
           (build-actions/build-actions
            {}
            (directory/directory "/p/webapps/ROOT" :action :delete)
-           (file/file "/p/webapps/ROOT.war" :action :delete)
+           (file/file "/p/webapps/ROOT.war" :action :delete)))
+         (first
+          (build-actions/build-actions
+           {:parameters
+            {:host {:id {:tomcat {:default {:base "/p/"
+                                            :webapps "/p/webapps"}}}}}}
+           (tomcat/undeploy nil)))))
+  (is (= (first
+          (build-actions/build-actions
+           {}
            (directory/directory "/p/webapps/app" :action :delete)
-           (file/file "/p/webapps/app.war" :action :delete)
+           (file/file "/p/webapps/app.war" :action :delete)))
+         (first
+          (build-actions/build-actions
+           {:parameters
+            {:host {:id {:tomcat {:default {:base "/p/"
+                                            :webapps "/p/webapps"}}}}}}
+           (tomcat/undeploy :app)))))
+  (is (= (first
+          (build-actions/build-actions
+           {}
            (directory/directory "/p/webapps/foo" :action :delete)
            (file/file "/p/webapps/foo.war" :action :delete)))
          (first
           (build-actions/build-actions
-           {:parameters {:host {:id {:tomcat {:base "/p/"}}}}}
-           (tomcat/undeploy nil :app "foo")))))
-  (is (= ""
-         (first (build-actions/build-actions
-                 {:parameters
-                  {:host {:id {:tomcat {:base "/p/"}}}}}
-                 (tomcat/undeploy))))))
+           {:parameters
+            {:host {:id {:tomcat {:default {:base "/p/"
+                                            :webapps "/p/webapps"}}}}}}
+           (tomcat/undeploy "foo"))))))
 
 (deftest tomcat-policy-test
   (is (= (first
@@ -110,7 +131,7 @@
             :literal true)))
          (first
           (build-actions/build-actions
-           {:parameters {:host {:id {:tomcat {:config-path "/p/"}}}}}
+           {:parameters {:host {:id {:tomcat {:default {:config-path "/p/"}}}}}}
            (tomcat/policy
             100 "hudson"
             {"file:${catalina.base}/webapps/hudson/-"
@@ -128,7 +149,7 @@
             :literal true)))
          (first
           (build-actions/build-actions
-           {:parameters {:host {:id {:tomcat {:config-path "/p/"}}}}}
+           {:parameters {:host {:id {:tomcat {:default {:config-path "/p/"}}}}}}
            (tomcat/policy
             100 "hudson"
             {nil ["permission java.lang.RuntimePermission \"getAttribute\""]}))))))
@@ -145,7 +166,7 @@
             :literal true)))
          (first
           (build-actions/build-actions
-           {:parameters {:host {:id {:tomcat {:config-path "/p/"}}}}}
+           {:parameters {:host {:id {:tomcat {:default {:config-path "/p/"}}}}}}
            (tomcat/application-conf
             "hudson"
             "content"))))))
@@ -369,7 +390,6 @@
        (tomcat/policy 1 "name" {})
        (tomcat/application-conf "name" "content")
        (tomcat/user "name" {:password "pwd"})
-       (tomcat/server-configuration (tomcat/server))
        (tomcat/settings {:server (tomcat/server)})
        (tomcat/server-configuration))))
 
