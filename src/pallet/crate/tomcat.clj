@@ -101,8 +101,8 @@
         group (or group tomcat-user)
         service (or service package)
         base-dir (or base-dir (str tomcat-base package "/"))
-        deploy-dir (or deploy-dir (str tomcat-base package "/webapps"))
-        webapps-dir (or webapps-dir (str tomcat-base package "/webapps"))
+        deploy-dir (or deploy-dir (str base-dir "webapps"))
+        webapps-dir (or webapps-dir (str base-dir "webapps"))
         config-dir (str tomcat-config-root package "/")
         use-jpackage (if (nil? use-jpackage)
                        (and
