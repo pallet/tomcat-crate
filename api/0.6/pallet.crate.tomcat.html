@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html><head><link href="css/default.css" rel="stylesheet" type="text/css"><script src="js/jquery.min.js" type="text/javascript"></script><script src="js/page_effects.js" type="text/javascript"></script><title>pallet.crate.tomcat documentation</title></head><body><div id="header"><h1><a href="index.html">Tomcat 0.6 API documentation</a></h1></div><div class="sidebar" id="namespaces"><h3>Namespaces</h3><ul><li class="current"><a href="pallet.crate.tomcat.html">pallet.crate.tomcat</a></li></ul></div><div class="sidebar" id="vars"><h3>Public Vars</h3><ul><li><a href="pallet.crate.tomcat.html#var-alias">alias</a></li><li><a href="pallet.crate.tomcat.html#var-application-conf">application-conf</a></li><li><a href="pallet.crate.tomcat.html#var-classname-for">classname-for</a></li><li><a href="pallet.crate.tomcat.html#var-connector">connector</a></li><li><a href="pallet.crate.tomcat.html#var-context">context</a></li><li><a href="pallet.crate.tomcat.html#var-default-settings-map">default-settings-map</a></li><li><a href="pallet.crate.tomcat.html#var-deploy">deploy</a></li><li><a href="pallet.crate.tomcat.html#var-engine">engine</a></li><li><a href="pallet.crate.tomcat.html#var-environment">environment</a></li><li><a href="pallet.crate.tomcat.html#var-extract-nested-maps">extract-nested-maps</a></li><li><a href="pallet.crate.tomcat.html#var-flatten-map">flatten-map</a></li><li><a href="pallet.crate.tomcat.html#var-global-resources">global-resources</a></li><li><a href="pallet.crate.tomcat.html#var-host">host</a></li><li><a href="pallet.crate.tomcat.html#var-init-service">init-service</a></li><li><a href="pallet.crate.tomcat.html#var-install">install</a></li><li><a href="pallet.crate.tomcat.html#var-listener">listener</a></li><li><a href="pallet.crate.tomcat.html#var-loader">loader</a></li><li><a href="pallet.crate.tomcat.html#var-pallet-type">pallet-type</a></li><li><a href="pallet.crate.tomcat.html#var-parameter">parameter</a></li><li><a href="pallet.crate.tomcat.html#var-path-for">path-for</a></li><li><a href="pallet.crate.tomcat.html#var-policies">policies</a></li><li><a href="pallet.crate.tomcat.html#var-policy">policy</a></li><li><a href="pallet.crate.tomcat.html#var-realm">realm</a></li><li><a href="pallet.crate.tomcat.html#var-resource">resource</a></li><li><a href="pallet.crate.tomcat.html#var-server">server</a></li><li><a href="pallet.crate.tomcat.html#var-server-configuration">server-configuration</a></li><li><a href="pallet.crate.tomcat.html#var-service">service</a></li><li><a href="pallet.crate.tomcat.html#var-settings">settings</a></li><li><a href="pallet.crate.tomcat.html#var-settings-map">settings-map</a></li><li><a href="pallet.crate.tomcat.html#var-ssl-apr-connector">ssl-apr-connector</a></li><li><a href="pallet.crate.tomcat.html#var-ssl-jsse-connector">ssl-jsse-connector</a></li><li><a href="pallet.crate.tomcat.html#var-tomcat">tomcat</a></li><li><a href="pallet.crate.tomcat.html#var-tomcat-config-changed-flag">tomcat-config-changed-flag</a></li><li><a href="pallet.crate.tomcat.html#var-tomcat-server-xml">tomcat-server-xml</a></li><li><a href="pallet.crate.tomcat.html#var-transaction">transaction</a></li><li><a href="pallet.crate.tomcat.html#var-undeploy">undeploy</a></li><li><a href="pallet.crate.tomcat.html#var-undeploy-all">undeploy-all</a></li><li><a href="pallet.crate.tomcat.html#var-user">user</a></li><li><a href="pallet.crate.tomcat.html#var-valve">valve</a></li><li><a href="pallet.crate.tomcat.html#var-watched-resource">watched-resource</a></li></ul></div><div class="namespace-docs" id="content"><h2>pallet.crate.tomcat documentation</h2><pre class="doc">Crate to install and configure tomcat.
+
+Installation sets the following host paramters:
+  - [:tomcat :base] base of the tomcat installation
+  - [:tomcat :config-path] path to the configuration files
+  - [:tomcat :owner] user that owns and runs tomcat
+  - [:tomcat :group] group for tomcat files
+  - [:tomcat :service] the name of the package installed
+
+Configuration is via `server-configuration`, passing a server configuration
+generated with a call to `server`.
+
+The tomcat service may be controlled via `init-service`.</pre><div class="public" id="var-alias"><h3>alias</h3><div class="usage"><code>(alias name)</code></div><pre class="doc">Define a tomcat alias.
+</pre></div><div class="public" id="var-application-conf"><h3>application-conf</h3><div class="usage"><code>(application-conf session name content &amp; {:keys [action instance], :or {action :create}, :as options})</code></div><pre class="doc">Configure tomcat applications.
+name - a name for the policy
+content - an xml application context</pre></div><div class="public" id="var-classname-for"><h3>classname-for</h3><div class="usage"><code>(classname-for value classname-map)</code></div><pre class="doc">Lookup value in the given map if it is a keyword, else return the value.
+</pre></div><div class="public" id="var-connector"><h3>connector</h3><div class="usage"><code>(connector &amp; options)</code></div><pre class="doc">Define a tomcat connector.
+</pre></div><div class="public" id="var-context"><h3>context</h3><div class="usage"><code>(context name &amp; options)</code></div><pre class="doc">Define a tomcat context.
+
+Accepts: loader, manager realm, valves, listeners, resources, resource-links
+parameters, environments, transactions and watched-resources
+
+Options are implemenation specific, and include:
+ - :backgroundProcessorDelay
+ - :className
+ - :cookies
+ - :crossContext
+ - :docBase
+ - :override
+ - :privileged
+ - :path
+ - :reloadable
+ - :sessionCookieDomain
+ - :sessionCookieName
+ - :sessionCookiePath
+ - :wrapperClass
+ - :useHttpOnly
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/context.html</pre></div><div class="public" id="var-default-settings-map"><h3>default-settings-map</h3><div class="usage"></div><pre class="doc">Default settings map for tomcat configuration
+</pre></div><div class="public" id="var-deploy"><h3>deploy</h3><div class="usage"><code>(deploy session app-name &amp; {:keys [instance], :as opts})</code></div><pre class="doc">Copies a .war file to the tomcat server under webapps/${app-name}.war.  An
+app-name of &quot;ROOT&quot; or nil will deploy the source war file as the / webapp.
+
+Accepts options as for remote-file in order to specify the source.
+
+Other Options:
+  :clear-existing true -- removes the existing exploded ${app-name} directory</pre></div><div class="public" id="var-engine"><h3>engine</h3><div class="usage"><code>(engine name default-host &amp; options)</code></div><pre class="doc">Define a tomcat engine.
+
+Accepts a realm, valves, and hosts.
+
+Options are specified in the tomcat docs, and include:
+ - :className
+ - :backgroundProcessorDelay
+ - :jvmRoute
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/engine.html</pre></div><div class="public" id="var-environment"><h3>environment</h3><div class="usage"><code>(environment name value type)</code><code>(environment name value type override)</code></div><pre class="doc">Define tomcat environment variable.
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/context.html#Environment_Entries</pre></div><div class="public" id="var-extract-nested-maps"><h3>extract-nested-maps</h3><div class="usage"><code>(extract-nested-maps [members collections options])</code></div><pre class="doc">
+</pre></div><div class="public" id="var-flatten-map"><h3>flatten-map</h3><div class="usage"><code>(flatten-map m &amp; dissoc-keys)</code></div><pre class="doc">Flatten a map, removing all namespaced keywords and specified keys
+</pre></div><div class="public" id="var-global-resources"><h3>global-resources</h3><div class="usage"><code>(global-resources &amp; options)</code></div><pre class="doc">Define tomcat resources.
+Options include:
+  resources, transactions, environments</pre></div><div class="public" id="var-host"><h3>host</h3><div class="usage"><code>(host name app-base &amp; options)</code></div><pre class="doc">Define a tomcat host.
+
+Accepts valves, contexts, aliases and listeners.
+
+Options are implementation specific, and include:
+ - :autoDeploy
+ - :backgroundProcessorDelay
+ - :className
+ - :deployOnStartup
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/host.html</pre></div><div class="public" id="var-init-service"><h3>init-service</h3><div class="usage"><code>(init-service session &amp; {:keys [action if-config-changed if-flag instance], :as options})</code></div><pre class="doc">Control the tomcat service.
+
+Specify `:if-config-changed true` to make actions conditional on a change in
+configuration.
+
+Other options are as for `pallet.action.service/service`. The service
+name is looked up in the request parameters.</pre></div><div class="public" id="var-install"><h3>install</h3><div class="usage"><code>(install session &amp; {:keys [action instance], :or {action :install}, :as options})</code></div><pre class="doc">Install tomcat from the standard package sources.
+
+On older centos versions, jpackge will be used to obtain tomcat 6 if
+version 6 is explicitly requested.
+
+Options controlling the installed package:
+- :version    specify the tomcat version (5, 6, or arbitrary string)
+- :package    the name of the package to install
+
+Options for specifying non-standard configuration used by the installed
+package:
+- :user       override the tomcat user
+- :group      override the tomcat group
+- :service    the name of the init service installed by the package
+- :base-dir   the install base used by the package
+- :config-dir the directory used for the configuration files</pre></div><div class="public" id="var-listener"><h3>listener</h3><div class="usage"><code>(listener listener-type &amp; options)</code></div><pre class="doc">Define a tomcat listener. listener-type is a classname or a key from
+`listener-classnames`.
+
+Options are listener-type specific, and match the attributes in the tomcat
+docs.
+
+For example, to configure the APR SSL support:
+    (listener :apr-lifecycle :SSLEngine &quot;on&quot; :SSLRandomSeed &quot;builtin&quot;)</pre></div><div class="public" id="var-loader"><h3>loader</h3><div class="usage"><code>(loader classname options)</code></div><pre class="doc">Define a tomcat class loader.
+
+Options are implementation specific, and include:
+ - :className
+ - :delegate
+ - :reloadable
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/loader.html</pre></div><div class="public" id="var-pallet-type"><h3>pallet-type</h3><div class="usage"><code>(pallet-type type-tag &amp; options)</code></div><pre class="doc">Create a pallet type-map
+</pre></div><div class="public" id="var-parameter"><h3>parameter</h3><div class="usage"><code>(parameter name value &amp; options)</code></div><pre class="doc">Define a tomcat parameter.
+
+Options are:
+  - :description
+  - :override
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/context.html#Context_Parameters</pre></div><div class="public" id="var-path-for"><h3>path-for</h3><div class="usage"><code>(path-for base)</code></div><pre class="doc">Get the actual filename corresponding to a template.
+</pre></div><div class="public" id="var-policies"><h3>policies</h3><div class="usage"><code>(policies session &amp; {:keys [instance], :as options})</code></div><pre class="doc">Configure tomcat policies.
+</pre></div><div class="public" id="var-policy"><h3>policy</h3><div class="usage"><code>(policy session number name grants &amp; {:keys [action instance], :or {action :create}, :as options})</code></div><pre class="doc">Configure tomcat policies.
+number - determines sequence i which policies are applied
+name - a name for the policy
+grants - a map from codebase to sequence of permissions</pre></div><div class="public" id="var-realm"><h3>realm</h3><div class="usage"><code>(realm realm-type &amp; options)</code></div><pre class="doc">Define a tomcat realm.
+
+Options are specified in the tomcat docs, and realm-type specific.
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/realm.html</pre></div><div class="public" id="var-resource"><h3>resource</h3><div class="usage"><code>(resource name resource-type &amp; options)</code></div><pre class="doc">Define tomcat JNDI resource.
+resource-type is a classname, or on of :sql-datasource.
+Options include:
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/resources.html
+</pre></div><div class="public" id="var-server"><h3>server</h3><div class="usage"><code>(server &amp; options)</code></div><pre class="doc">Define a tomcat server. Accepts server, listener and a global-resources
+form. The result of this function can be installed using
+`server-configuration`.
+
+  - ::services         vector of services
+  - ::global-resources vector of resources.
+
+Options include:
+  - :class-name       imlementation class name - org.apache.catalina.Server
+  - :port             shutdown listen port - 8005
+  - :shutdown         shutdown command string - SHUTDOWN
+
+    (server :port &quot;123&quot; :shutdown &quot;SHUTDOWNx&quot;
+      (global-resources)
+      (service
+        (engine &quot;catalina&quot; &quot;host&quot;
+          (valve :request-dumper))
+          (connector :port &quot;8080&quot; :protocol &quot;HTTP/1.1&quot;
+             :connectionTimeout &quot;20000&quot; :redirectPort &quot;8443&quot;)))</pre></div><div class="public" id="var-server-configuration"><h3>server-configuration</h3><div class="usage"><code>(server-configuration session &amp; {:keys [instance]})</code></div><pre class="doc">Install a tomcat server configuration.
+
+The `server` argument can be generated with `pallet.crate.tomcat/server`.
+
+When a tomcat configuration element is not specified, the relevant section of
+the template is output, unmodified.</pre></div><div class="public" id="var-service"><h3>service</h3><div class="usage"><code>(service &amp; options)</code></div><pre class="doc">Define a tomcat service.
+Requires an engine and connectors.
+
+    (service (engine ) (connector)
+
+Options are implementation specific, and includes:
+ - :className
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/service.html</pre></div><div class="public" id="var-settings"><h3>settings</h3><div class="usage"><code>(settings session {:keys [user group version package service base-dir config-dir use-jpackage server instance deploy-dir webapps-dir], :as settings-map})</code></div><pre class="doc">Calculates and attaches the settings to the request object, for later use.
+:instance  an id used to discriminate between multiple installs.</pre></div><div class="public" id="var-settings-map"><h3>settings-map</h3><div class="usage"><code>(settings-map {:keys [user group version package service base-dir config-dir use-jpackage server policies], :as options})</code></div><pre class="doc">Build a settings map for tomcat, containing all target independent
+configuration.
+  :user        owner for the tomcat service
+  :group       group for the tomcat service
+  :version     tomcat major version
+  :package     tomcat package name to install
+  :service     tomcat service name
+  :base-dir    location of tomcat install
+  :config-dir  location of tomcat configuration files
+  :use-jpackge flag to control use of jpackage
+  :server      tomcat server definition (result of calling tomcat/server)
+  :policies    tomcat policies, as a sequence of [seq-number name grants]</pre></div><div class="public" id="var-ssl-apr-connector"><h3>ssl-apr-connector</h3><div class="usage"><code>(ssl-apr-connector &amp; options)</code></div><pre class="doc">Define a SSL connector using APR.  This connector can be specified for a
+service.  You can use the :SSLEngine and :SSLRandomSeed options on the
+server's APR lifecycle listener to configure which engine is used.
+
+This connector has defaults equivalant to:
+  (tomcat/connector :port 8443 :protocol &quot;HTTP/1.1&quot; :SSLEnabled &quot;true&quot;
+    :maxThreads 150 :scheme &quot;https&quot; :secure &quot;true&quot;
+    :clientAuth &quot;optional&quot; :sslProtocol &quot;TLSv1&quot;
+    :SSLCertificateFile &quot;/usr/local/ssl/server.crt&quot;
+    :SSLCertificateKeyFile=&quot;/usr/local/ssl/server.pem&quot;)</pre></div><div class="public" id="var-ssl-jsse-connector"><h3>ssl-jsse-connector</h3><div class="usage"><code>(ssl-jsse-connector &amp; options)</code></div><pre class="doc">Define a SSL connector using JSEE.  This connector can be specified for a
+service.
+
+This connector has defaults equivalant to:
+  (tomcat/connector :port 8443 :protocol &quot;HTTP/1.1&quot; :SSLEnabled &quot;true&quot;
+    :maxThreads 150 :scheme &quot;https&quot; :secure &quot;true&quot;
+    :clientAuth &quot;false&quot; :sslProtocol &quot;TLS&quot;
+    :keystoreFile &quot;${user.home}/.keystore&quot; :keystorePass &quot;changeit&quot;)</pre></div><div class="public" id="var-tomcat"><h3>tomcat</h3><div class="usage"><code>(tomcat &amp; args)</code></div><pre class="doc">DEPRECATED: use install instead.
+</pre></div><div class="public" id="var-tomcat-config-changed-flag"><h3>tomcat-config-changed-flag</h3><div class="usage"></div><pre class="doc">Flag for recognising changes to configuration
+</pre></div><div class="public" id="var-tomcat-server-xml"><h3>tomcat-server-xml</h3><div class="usage"><code>(tomcat-server-xml session server)</code></div><pre class="doc">Generate server.xml content
+</pre></div><div class="public" id="var-transaction"><h3>transaction</h3><div class="usage"><code>(transaction factory-classname)</code></div><pre class="doc">Define tomcat transaction factory.
+</pre></div><div class="public" id="var-undeploy"><h3>undeploy</h3><div class="usage"><code>(undeploy session app-name &amp; {:keys [instance]})</code></div><pre class="doc">Removes the named webapp directory, and any war files with the same base
+name.</pre></div><div class="public" id="var-undeploy-all"><h3>undeploy-all</h3><div class="usage"><code>(undeploy-all session &amp; {:keys [instance]})</code></div><pre class="doc">Removes all deployed war file and exploded webapp directories.
+</pre></div><div class="public" id="var-user"><h3>user</h3><div class="usage"><code>(user session &amp; {:keys [role], :as options})</code></div><pre class="doc">Configure tomcat users. Options are:
+:role rolename
+username {:password &quot;pw&quot; :roles [&quot;role1&quot; &quot;role 2&quot;]}</pre></div><div class="public" id="var-valve"><h3>valve</h3><div class="usage"><code>(valve valve-type &amp; options)</code></div><pre class="doc">Define a tomcat valve.
+
+Options are specified in the tomcat docs, and valve-type specific.
+
+http://tomcat.apache.org/tomcat-6.0-doc/config/valve.html</pre></div><div class="public" id="var-watched-resource"><h3>watched-resource</h3><div class="usage"><code>(watched-resource name)</code></div><pre class="doc">Define a tomcat watched resource. Used in a tomcat context.
+</pre></div></div></body></html>
