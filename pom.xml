@@ -8,7 +8,9 @@
   </parent>
   <artifactId>tomcat</artifactId>
   <version>0.6.2-SNAPSHOT</version>
-
+  <description>
+    Crate for the installation and configuration of Apache Tomcat
+  </description>
   <scm>
     <connection>scm:git:git://github.com/pallet/tomcat-crate.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/pallet/tomcat-crate.git</developerConnection>
