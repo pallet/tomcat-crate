@@ -476,27 +476,15 @@ swallowOutput=\"true\">
       :count 1
       :phases {:bootstrap (phase/phase-fn
                            (automated-admin-user/automated-admin-user))
-               :settings (phase/phase-fn (tomcat/settings settings-map))
+               :settings (phase/phase-fn
+                          (java/java-settings {})
+                          (tomcat/settings settings-map))
                :configure (fn [request]
                             (->
                              request
+                             (java/install-java)
                              (tomcat/install)
                              (tomcat/server-configuration)
-                             (thread-expr/when->
-                              (#{:centos :rhel :fedora}
-                               (session/os-family request))
-                              (remote-file/remote-file
-                               "jdk.bin"
-                               :local-file
-                               (if (compute/is-64bit? (:target-node request))
-                                 "artifacts/jdk-6u23-linux-x64-rpm.bin"
-                                 "artifacts/jdk-6u24-linux-i586-rpm.bin")
-                               :mode "755")
-                              (java/java :sun :jdk :rpm-bin "./jdk.bin"))
-                             (thread-expr/when->
-                              (not (#{:centos :rhel :fedora}
-                                    (session/os-family request)))
-                              (java/java :sun :jdk))
                              (tomcat/application-conf
                               "pallet-live-test" application-config)
                              (thread-expr/let-with-arg->
