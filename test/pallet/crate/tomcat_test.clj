@@ -27,7 +27,9 @@
     [pallet.thread-expr :as thread-expr])
   (:use
    clojure.test
-   pallet.test-utils))
+   pallet.test-utils
+   [pallet.parameter :only [get-target-settings]]
+   [pallet.parameter-test :only [settings-test]]))
 
 (use-fixtures :once with-ubuntu-script-template with-bash-script-language)
 
@@ -35,11 +37,7 @@
   (is (= (first
           (build-actions/build-actions
            {}
-           (package/package-manager :update)
            (package/package "tomcat6")
-           (directory/directory
-            (stevedore/script (~lib/user-home "tomcat6"))
-            :owner "tomcat6" :group "tomcat6" :mode "0755")
            (exec-script/exec-checked-script
             "Check tomcat is at /var/lib/tomcat6/"
             (if-not (directory? "/var/lib/tomcat6/")
@@ -49,10 +47,9 @@
          (first
           (build-actions/build-actions
            {}
-           (tomcat/settings {})
-           (tomcat/install)
-           (parameter-test/parameters-test
-            [:host :id :tomcat :default :base] "/var/lib/tomcat6/"))))))
+           (tomcat/tomcat-settings {})
+           (tomcat/install-tomcat)
+           (settings-test :tomcat nil :base "/var/lib/tomcat6/"))))))
 
 (deftest classname-for-test
   (let [m {:a "a" :b "b"}]
@@ -182,13 +179,13 @@
             :role "r2" "u2" {:password "p2" :roles ["r1","r2"]}))))))
 
 (deftest extract-member-keys-test
-  (are [#{:m} #{:c} [:m 1 :c 2 :c 3 :d 1]] =
-       (tomcat/extract-member-keys
-        [:members [:m] :collections [:c] :m 1 :c 2 :c 3 :d 1]))
-  (are [#{:m} #{} [:m 1 :c 2 :c 3 :d 1]] =
-       (tomcat/extract-member-keys [:members [:m] :m 1 :c 2 :c 3 :d 1]))
-  (are [#{} #{} [:m 1 :c 2 :c 3 :d 1]] =
-       (tomcat/extract-member-keys [:m 1 :c 2 :c 3 :d 1])))
+  (is (= [#{:m} #{:c} [:m 1 :c 2 :c 3 :d 1]]
+         (tomcat/extract-member-keys
+          [:members [:m] :collections [:c] :m 1 :c 2 :c 3 :d 1])))
+  (is (= [#{:m} #{} [:m 1 :c 2 :c 3 :d 1]]
+         (tomcat/extract-member-keys [:members [:m] :m 1 :c 2 :c 3 :d 1])))
+  (is (= [#{} #{} [:m 1 :c 2 :c 3 :d 1]]
+         (tomcat/extract-member-keys [:m 1 :c 2 :c 3 :d 1]))))
 
 (deftest extract-nested-maps-test
   (is (= {:d 1
@@ -346,7 +343,7 @@
          (first
           (build-actions/build-actions
            {:parameters {:host {:id {:tomcat {:base "/var/lib/tomcat6/"}}}}}
-           (tomcat/settings
+           (tomcat/tomcat-settings
             {:server (tomcat/server
                       :port "123" :shutdown "SHUTDOWNx"
                       (tomcat/listener :global-resources-lifecycle)
@@ -370,19 +367,17 @@
          (first
           (build-actions/build-actions
            {:parameters {:host {:id {:tomcat {:base "/var/lib/tomcat6/"}}}}}
-           (tomcat/settings {:server (tomcat/server)})
+           (tomcat/tomcat-settings {:server (tomcat/server)})
            (tomcat/server-configuration))))))
 
 (deftest invoke-test
   (is (build-actions/build-actions
        {:blobstore (blobstore/service "url-blobstore")
         :environment {:blobstore (blobstore/service "url-blobstore")}}
-       (tomcat/settings {})
-       (tomcat/install)
-       (tomcat/settings {:version 6})
-       (tomcat/install)
-       (tomcat/settings {:version "tomcat-6-1.2"})
-       (tomcat/install)
+       (tomcat/tomcat-settings {})
+       (tomcat/install-tomcat)
+       (tomcat/tomcat-settings {:version [6]})
+       (tomcat/install-tomcat)
        (tomcat/undeploy "app")
        (tomcat/undeploy-all)
        (tomcat/deploy "app" :content "")
@@ -390,7 +385,7 @@
        (tomcat/policy 1 "name" {})
        (tomcat/application-conf "name" "content")
        (tomcat/user "name" {:password "pwd"})
-       (tomcat/settings {:server (tomcat/server)})
+       (tomcat/tomcat-settings {:server (tomcat/server)})
        (tomcat/server-configuration))))
 
 (def ^{:doc "An html file for tomcat to server to verify we have it running."}
@@ -418,7 +413,7 @@ path=\"/pallet-live-test\"
 swallowOutput=\"true\">
 </Context>")
 
-(def settings-map (tomcat/settings-map {:version 6}))
+(def settings-map {:version [6]})
 
 (def tomcat-6-unsupported
   [{:os-family :debian :os-version-matches "5.0.7"}
@@ -434,26 +429,26 @@ swallowOutput=\"true\">
       :count 1
       :phases {:bootstrap (phase/phase-fn
                            (automated-admin-user/automated-admin-user))
-               :settings (phase/phase-fn (tomcat/settings settings-map))
-               :configure (phase/phase-fn
-                           (tomcat/install)
-                           (tomcat/server-configuration)
-                           (tomcat/application-conf
-                            "pallet-live-test" application-config)
-                           (thread-expr/let-with-arg->
-                             request
-                             [tomcat-base (parameter/get-for-target
-                                           request [:tomcat :base])]
-                             (directory/directory
-                              (str tomcat-base "webapps/pallet-live-test/"))
-                             (remote-file/remote-file
-                              (str
-                               tomcat-base "webapps/pallet-live-test/index.jsp")
-                              :content index-html :literal true
-                              :flag-on-changed
-                              tomcat/tomcat-config-changed-flag))
-                           (tomcat/init-service
-                            :if-config-changed true :action :restart))
+               :settings (phase/phase-fn (tomcat/tomcat-settings settings-map))
+               :configure (fn [session]
+                            (let [settings (get-target-settings
+                                            session :tomcat nil)
+                                  appdir (str (:webapps settings)
+                                              "pallet-live-test/")]
+                              (->
+                               session
+                               (tomcat/install-tomcat)
+                               (tomcat/server-configuration)
+                               (tomcat/application-conf
+                                "pallet-live-test" application-config)
+                               (directory/directory appdir)
+                               (remote-file/remote-file
+                                (str appdir "index.jsp")
+                                :content index-html :literal true
+                                :flag-on-changed
+                                tomcat/tomcat-config-changed-flag)
+                               (tomcat/init-service
+                                :if-config-changed true :action :restart))))
                :verify (phase/phase-fn
                         (network-service/wait-for-http-status
                          "http://localhost:8080/pallet-live-test/"
@@ -478,29 +473,26 @@ swallowOutput=\"true\">
                            (automated-admin-user/automated-admin-user))
                :settings (phase/phase-fn
                           (java/java-settings {})
-                          (tomcat/settings settings-map))
-               :configure (fn [request]
-                            (->
-                             request
-                             (java/install-java)
-                             (tomcat/install)
-                             (tomcat/server-configuration)
-                             (tomcat/application-conf
-                              "pallet-live-test" application-config)
-                             (thread-expr/let-with-arg->
-                               request
-                               [tomcat-base (parameter/get-for-target
-                                             request [:tomcat :base])]
-                               (directory/directory
-                                (str tomcat-base "webapps/pallet-live-test/"))
+                          (tomcat/tomcat-settings settings-map))
+               :configure (fn [session]
+                            (let [settings (get-target-settings
+                                            session :tomcat nil)
+                                  appdir (str (:webapps settings)
+                                              "pallet-live-test/")]
+                              (->
+                               session
+                               (java/install-java)
+                               (tomcat/install-tomcat)
+                               (tomcat/server-configuration)
+                               (tomcat/application-conf
+                                "pallet-live-test" application-config)
+                               (directory/directory appdir)
                                (remote-file/remote-file
-                                (str
-                                 tomcat-base
-                                 "webapps/pallet-live-test/index.jsp")
+                                (str appdir "index.jsp")
                                 :content index-html :literal true
-                                :flag-on-changed tomcat/tomcat-config-changed-flag))
-                             (tomcat/init-service
-                              :if-config-changed true :action :restart)))
+                                :flag-on-changed tomcat/tomcat-config-changed-flag)
+                               (tomcat/init-service
+                                :if-config-changed true :action :restart))))
                :verify (phase/phase-fn
                         (network-service/wait-for-http-status
                          "http://localhost:8080/pallet-live-test/"

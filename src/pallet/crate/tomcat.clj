@@ -1,24 +1,33 @@
 (ns pallet.crate.tomcat
   "Crate to install and configure tomcat.
 
-   Installation sets the following host paramters:
-     - [:tomcat :base] base of the tomcat installation
-     - [:tomcat :config-path] path to the configuration files
-     - [:tomcat :owner] user that owns and runs tomcat
-     - [:tomcat :group] group for tomcat files
-     - [:tomcat :service] the name of the package installed
+Installation sets the following settings under the :tomcat key:
 
-   Configuration is via `server-configuration`, passing a server configuration
-   generated with a call to `server`.
+:base
+base of the tomcat installation
 
-   The tomcat service may be controlled via `init-service`."
+:config-path
+path to the configuration files
+
+:owner
+user that owns and runs tomcat
+
+:group
+group for tomcat files
+
+:service
+the name of the package installed
+
+Configuration is via `server-configuration`, passing a server configuration
+generated with a call to `server`.
+
+The tomcat service may be controlled via `init-service`."
   (:refer-clojure :exclude [alias])
   (:require
    [pallet.action :as action]
    [pallet.action.directory :as directory]
    [pallet.action.exec-script :as exec-script]
    [pallet.action.file :as file]
-   [pallet.action.package :as package]
    [pallet.action.package.jpackage :as jpackage]
    [pallet.action.remote-file :as remote-file]
    [pallet.action.service :as service]
@@ -32,157 +41,214 @@
    [pallet.thread-expr :as thread-expr]
    [net.cgrand.enlive-html :as enlive-html]
    [clojure.contrib.prxml :as prxml]
-   [clojure.string :as string]))
+   [clojure.tools.logging :as logging]
+   [clojure.string :as string])
+  (:use
+   [pallet.action :only [with-action-options]]
+   [pallet.action.exec-script :only [exec-checked-script]]
+   [pallet.action.package :only [package package-manager* package-source]]
+   [pallet.common.context :only [throw-map]]
+   [pallet.compute :only [os-hierarchy]]
+   [pallet.parameter :only [assoc-target-settings get-target-settings]]
+   [pallet.thread-expr :only [apply-map->]]
+   [pallet.version-dispatch
+    :only [defmulti-version-crate defmulti-version defmulti-os-crate
+           multi-version-session-method multi-version-method
+           multi-os-session-method]]
+   [pallet.versions :only [version-string]]))
 
 (def
   ^{:doc "Baseline configuration file path" :private true}
   tomcat-config-root "/etc/")
 
-(def
-  ^{:doc "Baseline install path" :private true}
-  tomcat-base "/var/lib/")
-
-(def
-  ^{:doc "package names for specific versions" :private true}
-  version-package
-  {6 "tomcat6"
-   5 "tomcat5"})
-
-(def
-  ^{:doc "default package name for each packager" :private true}
-  package-name
-  {:aptitude "tomcat6"
-   :pacman "tomcat"
-   :yum "tomcat5"
-   :amzn-linux "tomcat6"})
-
-(def
- ^{:doc "default user and group name for each packager" :private true}
-  tomcat-user-group-name
-  {:aptitude "tomcat6"
-   :pacman "tomcat"
-   :yum "tomcat"})
-
 (def ^{:doc "Flag for recognising changes to configuration"}
   tomcat-config-changed-flag "tomcat-config")
 
+;;; Tomcat package name
+(defmulti-version tomcat-package [os os-version version]
+  #'os-hierarchy)
+
+(multi-version-method
+    tomcat-package {:os :rh-base}
+    [os os-version version]
+  (str "tomcat" (version-string version)))
+
+(multi-version-method
+    tomcat-package {:os :debian-base}
+    [os os-version version]
+  (str "tomcat" (version-string version)))
+
+(multi-version-method
+    tomcat-package {:os :arch-base}
+    [os os-version version]
+  "tomcat")
+
+;;; Default Tomcat package version
+(defmulti-os-crate tomcat-package-version [session])
+
+(multi-os-session-method
+    tomcat-package-version {:os :linux}
+    [os os-version session]
+  [6])
+
+;;; Default Settings
+(defmulti-version-crate default-settings [version session settings])
+
+(defn common-settings
+  [settings version]
+  (let [base (str "/var/lib/"
+                  (or (:package settings) (str "tomcat" version))
+                  "/")]
+    (->
+     settings
+     (update-in [:owner] #(or % (str "tomcat" version)))
+     (update-in [:group] #(or % "tomcat"))
+     (update-in [:base] #(or % base))
+     (update-in [:deploy] #(or % (str base "webapps/")))
+     (update-in [:webapps] #(or % (str base "webapps/")))
+     (update-in [:config-path] #(or % base))
+     (update-in [:service] #(or % (str "tomcat" version))))))
+
+(multi-version-session-method
+    default-settings {:os :rh-base}
+    [os os-version version session settings]
+
+  (->
+   (cond
+     (:strategy settings) settings
+     (:jpackage settings) (assoc settings :strategy :jpackage)
+     (:package-source settings) (assoc settings :strategy :package-source)
+     :else (assoc settings :strategy :package))
+   (update-in [:package] #(or % (tomcat-package os os-version version)))
+   (common-settings version)))
+
+(multi-version-session-method
+    default-settings {:os :debian-base}
+    [os os-version version session settings]
+  (->
+   (cond
+     (:strategy settings) settings
+     (:package-source settings) (assoc settings :strategy :package-source)
+     :else (assoc settings :strategy :package))
+   (update-in [:package] #(or % (tomcat-package os os-version version)))
+   (update-in [:group] #(or % (str "tomcat" version)))
+   (common-settings version)))
+
+(multi-version-session-method
+    default-settings {:os :arch-base}
+    [os os-version version session settings]
+  (->
+   (cond
+     (:strategy settings) settings
+     (:package-source settings) (assoc settings :strategy :package-source)
+     :else (assoc settings :strategy :package))
+   (update-in [:package] #(or % (tomcat-package os os-version version)))
+   (common-settings version)))
+
 (declare default-settings-map)
 
-(defn settings-map
-  "Build a settings map for tomcat, containing all target independent
-   configuration.
-     :user        owner for the tomcat service
-     :group       group for the tomcat service
-     :version     tomcat major version
-     :package     tomcat package name to install
-     :service     tomcat service name
-     :base-dir    location of tomcat install
-     :config-dir  location of tomcat configuration files
-     :use-jpackge flag to control use of jpackage
-     :server      tomcat server definition (result of calling tomcat/server)
-     :policies    tomcat policies, as a sequence of [seq-number name grants]"
-  [{:keys [user group version package service base-dir config-dir use-jpackage
-           server policies]
-    :as options}]
-  (merge default-settings-map options))
-
-(defn settings
+(defn tomcat-settings
   "Calculates and attaches the settings to the request object, for later use.
-    :instance  an id used to discriminate between multiple installs."
+ :instance  an id used to discriminate between multiple installs.
+
+On older centos versions, jpackge will be used to obtain tomcat 6 if
+version 6 is explicitly requested.
+
+Options controlling the installation method:
+
+:strategy
+A keyword specifying one of :package, :jpackage, :package-source
+
+Options controlling the installed package:
+
+:version
+specify the tomcat version (5, 6, or arbitrary string)
+
+:package
+the name of the package to install
+
+:package-source
+takes a map of options to package-source. When used with :debs,
+specifies the local path for the deb files to be expanded to.  should specify
+a :name key.
+
+Options for specifying non-standard configuration used by the installed
+package:
+- :user       override the tomcat user
+- :group      override the tomcat group
+- :service    the name of the init service installed by the package
+- :base       the install base used by the package
+- :config-dir the directory used for the configuration files"
   [session {:keys [user group version package service base-dir config-dir
-                   use-jpackage server instance deploy-dir webapps-dir]
-            :as settings-map}]
-  (let [package (or package
-                    (version-package version version)
-                    (package-name (session/os-family session))
-                    (package-name (session/packager session)))
-        tomcat-user (tomcat-user-group-name (session/packager session))
-        user (or user tomcat-user)
-        group (or group tomcat-user)
-        service (or service package)
-        base-dir (or base-dir (str tomcat-base package "/"))
-        deploy-dir (or deploy-dir (str tomcat-base package "/webapps"))
-        webapps-dir (or webapps-dir (str tomcat-base package "/webapps"))
-        config-dir (str tomcat-config-root package "/")
-        use-jpackage (if (nil? use-jpackage)
-                       (and
-                        (= :centos (session/os-family session))
-                        (re-matches
-                         #"5\.[0-5]" (session/os-version session)))
-                       use-jpackage)]
-    (-> session
-        (parameter/assoc-target-settings
-         :tomcat instance
-         (merge
-          settings-map
-          {:package package
-           :base base-dir
-           :deploy deploy-dir
-           :webapps webapps-dir
-           :config-path config-dir
-           :owner user
-           :group group
-           :service service
-           :use-jpackage use-jpackage})))))
+                   server instance deploy-dir webapps-dir
+                   strategy instance-id]
+            :or {version (tomcat-package-version session)}
+            :as settings}]
+  (let [settings (merge {:version version} settings)
+        settings (merge
+                  default-settings-map
+                  (default-settings session version settings))]
+    (assoc-target-settings session :tomcat instance-id settings)))
 
-(defn install
-  "Install tomcat from the standard package sources.
+;;; # Install
 
-   On older centos versions, jpackge will be used to obtain tomcat 6 if
-   version 6 is explicitly requested.
+;;; Dispatch to install strategy
+(defmulti install-method (fn [session settings] (:strategy settings)))
 
-   Options controlling the installed package:
-   - :version    specify the tomcat version (5, 6, or arbitrary string)
-   - :package    the name of the package to install
+(defmethod install-method :package [session settings]
+  (package session (:package settings)))
 
-   Options for specifying non-standard configuration used by the installed
-   package:
-   - :user       override the tomcat user
-   - :group      override the tomcat group
-   - :service    the name of the init service installed by the package
-   - :base-dir   the install base used by the package
-   - :config-dir the directory used for the configuration files"
-  ;; ([session & {:keys [user group version package service
-  ;;                    base-dir config-dir] :as options}]
-  ;;    (->
-  ;;     session
-  ;;     (thread-expr/apply-map-> settings (settings-map options))
-  ;;     install))
-  [session & {:keys [action instance] :or {action :install} :as options}]
-  (let [session (if (pos? (count (dissoc options :action)))
-                  (settings session (settings-map options))
-                  session)
-        settings (parameter/get-target-settings session :tomcat instance)
-        package (:package settings)
-        user (:owner settings)
-        group (:group settings)
-        base-dir (:base settings)
-        use-jpackage (:use-jpackage settings)
-        pkg-options (when use-jpackage
-                      {:enable
-                       ["jpackage-generic" "jpackage-generic-updates"]})]
-    (-> session
-        (thread-expr/when->
-         use-jpackage
-         (jpackage/add-jpackage :releasever "5.0")
-         (jpackage/package-manager-update-jpackage)
-         (jpackage/jpackage-utils))
-        (package/package-manager :update)
-        (thread-expr/apply-map-> package/package package pkg-options)
-        (directory/directory ;; fix jpackage ownership of tomcat home
-         (stevedore/script (~lib/user-home ~user))
-         :owner user :group group :mode "0755")
-        (exec-script/exec-checked-script
+(defmethod install-method :package-source [session settings]
+  (let [repo-name (-> settings :package-source :name)
+        _ (assert repo-name)    ;  "Must provide a repo name for package-source"
+        pkg-list-update (package-manager* session :update :t repo-name)
+        _ (logging/infof "update package list with %s" pkg-list-update)
+        session (->
+                 session
+                 (apply-map->
+                  package-source repo-name (:package-source settings))
+                 (with-action-options {:always-before #{`package}
+                                       :always-after #{`package-source}}
+                   (exec-checked-script
+                    (str "Update package list for repository " repo-name)
+                    ~pkg-list-update)))]
+    (package session (:package settings))))
+
+(defmethod install-method :jpackage [session settings]
+  (let [{:keys [owner group]} settings]
+    (->
+     session
+     (jpackage/add-jpackage :releasever "5.0")
+     (jpackage/package-manager-update-jpackage)
+     (jpackage/jpackage-utils)
+     (package
+      (:package settings)
+      :enable ["jpackage-generic" "jpackage-generic-updates"])
+     (directory/directory ;; fix jpackage ownership of tomcat home
+      (stevedore/script (~lib/user-home ~owner))
+      :owner owner :group group :mode "0755"))))
+
+(defn install-tomcat
+  "Install tomcat."
+  [session & {:keys [instance-id]}]
+  (let [settings (get-target-settings
+                  session :tomcat instance-id ::no-settings)
+        base-dir (:base settings)]
+    (logging/debugf "install-java settings %s" settings)
+    (if (= settings ::no-settings)
+      (throw-map
+       "Attempt to install tomcat without specifying settings"
+       {:message "Attempt to install tomcat without specifying settings"
+        :type :invalid-operation})
+      (->
+       session
+       (install-method settings)
+       (exec-script/exec-checked-script
          (format "Check tomcat is at %s" base-dir)
          (if-not (directory? ~base-dir)
            (do
              (println "Tomcat not installed at expected location")
-             (exit 1)))))))
-
-(defn tomcat
-  "DEPRECATED: use install instead."
-  [& args]
-  (apply install args))
+             (exit 1))))))))
 
 (defn init-service
   "Control the tomcat service.
@@ -397,9 +463,9 @@
       :combined "org.apache.catalina.realm.CombinedRealm"
       :lock-out "org.apache.catalina.realm.LockOutRealm"})
 
-(def *server-file* "server.xml")
-(def *context-file* "context.xml")
-(def *web-file* "web.xml")
+(def ^{:dynamic true} *server-file* "server.xml")
+(def ^{:dynamic true} *context-file* "context.xml")
+(def ^{:dynamic true} *web-file* "web.xml")
 
 (defn path-for
   "Get the actual filename corresponding to a template."
@@ -526,9 +592,9 @@
          members #{}
          collections #{}]
     (if options
-      (condp = (first options)
+      (case (first options)
         :members (recur (nnext options) output (set (fnext options)) collections)
-        :collections (recur (nnext options) output members (set (fnext collections)))
+        :collections (recur (nnext options) output members (set (fnext options)))
         (recur (next options) (conj output (first options)) members collections))
       [members collections output])))
 
