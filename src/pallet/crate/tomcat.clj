@@ -55,7 +55,7 @@ The tomcat service may be controlled via `init-service`."
     :only [defmulti-version-crate defmulti-version defmulti-os-crate
            multi-version-session-method multi-version-method
            multi-os-session-method]]
-   [pallet.versions :only [version-string]]))
+   [pallet.versions :only [as-version-vector version-string]]))
 
 (def
   ^{:doc "Baseline configuration file path" :private true}
@@ -107,7 +107,7 @@ The tomcat service may be controlled via `init-service`."
      (update-in [:deploy] #(or % (str base "webapps/")))
      (update-in [:webapps] #(or % (str base "webapps/")))
      (update-in [:config-path] #(or % base))
-     (update-in [:service] #(or % (str "tomcat" version))))))
+     (update-in [:service] #(or % (str "tomcat" (version-string version)))))))
 
 (multi-version-session-method
     default-settings {:os :rh-base}
@@ -182,12 +182,13 @@ package:
   [session {:keys [user group version package service base-dir config-dir
                    server instance deploy-dir webapps-dir
                    strategy instance-id]
-            :or {version (tomcat-package-version session)}
+            :or {version (version-string (tomcat-package-version session))}
             :as settings}]
   (let [settings (merge {:version version} settings)
         settings (merge
                   default-settings-map
-                  (default-settings session version settings))]
+                  (default-settings
+                    session (as-version-vector version) settings))]
     (assoc-target-settings session :tomcat instance-id settings)))
 
 ;;; # Install
