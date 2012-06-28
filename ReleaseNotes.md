@@ -1,6 +1,10 @@
 # Release notes
 
-## tomcat-0.6.1
+## 0.7.0-beta.1
+
+- Update for pallet 0.7.0
+
+## 0.6.1
 
 - Relax check on call of tomcat/server as crate function
   The check was triggered by calling server with no direct options
@@ -15,7 +19,7 @@
 
 - Enable use of multiple tomcat instances
 
-## tomcat-0.6.0
+## 0.6.0
 
 - Add scm information to enable module release
 
