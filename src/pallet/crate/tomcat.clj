@@ -101,7 +101,7 @@ The tomcat service may be controlled via `init-service`."
                   "/")]
     (->
      settings
-     (update-in [:owner] #(or % (str "tomcat" version)))
+     (update-in [:owner] #(or % (str "tomcat" (version-string version))))
      (update-in [:group] #(or % "tomcat"))
      (update-in [:base] #(or % base))
      (update-in [:deploy] #(or % (str base "webapps/")))
@@ -131,7 +131,7 @@ The tomcat service may be controlled via `init-service`."
      (:package-source settings) (assoc settings :strategy :package-source)
      :else (assoc settings :strategy :package))
    (update-in [:package] #(or % (tomcat-package os os-version version)))
-   (update-in [:group] #(or % (str "tomcat" version)))
+   (update-in [:group] #(or % (str "tomcat" (version-string version))))
    (common-settings version)))
 
 (multi-version-session-method
