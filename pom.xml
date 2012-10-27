@@ -29,9 +29,12 @@
     <dependency>
       <groupId>org.cloudhoist</groupId>
       <artifactId>java</artifactId>
-      <version>0.7.0</version>
+      <version>0.7.1-SNAPSHOT</version>
       <optional>true</optional>
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <properties>
+    <pallet.version>0.7.3-SNAPSHOT</pallet.version>
+  </properties>
 </project>
