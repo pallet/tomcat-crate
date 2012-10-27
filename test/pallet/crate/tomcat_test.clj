@@ -28,6 +28,7 @@
   (:use
    clojure.test
    pallet.test-utils
+   [pallet.action.exec-script :only [exec-checked-script]]
    [pallet.parameter :only [get-target-settings]]
    [pallet.parameter-test :only [settings-test]]))
 
@@ -413,6 +414,23 @@ path=\"/pallet-live-test\"
 swallowOutput=\"true\">
 </Context>")
 
+(def keystore-file "/tmp/tc.ks")
+
+(defn ssl-keystore
+  "Create a keystore with a self signed ssl certificate."
+  [session]
+  ;; dname values taken from keytool manpage
+  (exec-checked-script
+   session
+   "Create keystore"
+   (when (not (file-exists? ~keystore-file))
+     (keytool
+      -genkey -alias tomcat -keyalg RSA
+      -dname
+      (quoted "CN=Mark Smith, OU=Java, O=Sun, L=Cupertino, S=California, C=US")
+      -keystore ~keystore-file -storepass changeit -keypass changeit))))
+
+
 (def settings-map {:version [6]})
 
 (def tomcat-6-unsupported
@@ -428,6 +446,7 @@ swallowOutput=\"true\">
      {:image image
       :count 1
       :phases {:bootstrap (phase/phase-fn
+                           (package/package-manager :update)
                            (automated-admin-user/automated-admin-user))
                :settings (phase/phase-fn (tomcat/tomcat-settings settings-map))
                :configure (fn [session]
@@ -461,6 +480,83 @@ swallowOutput=\"true\">
                           (grep -i (quoted "openjdk")))))}}}
     (core/lift (:tomcat node-types) :phase :verify :compute compute))))
 
+(def ciphers
+  ;; http://blog.techstacks.com/2008/09/securing-ssl-in-tomcat-part-two.html
+  "SSL_RSA_WITH_RC4_128_MD5, SSL_RSA_WITH_RC4_128_SHA, TLS_RSA_WITH_AES_128_CBC_SHA, TLS_DHE_RSA_WITH_AES_128_CBC_SHA, TLS_DHE_DSS_WITH_AES_128_CBC_SHA, SSL_RSA_WITH_3DES_EDE_CBC_SHA, SSL_DHE_RSA_WITH_3DES_EDE_CBC_SHA, SSL_DHE_DSS_WITH_3DES_EDE_CBC_SHA")
+
+(deftest live-test-with-ssl
+  (live-test/test-for
+   [image (live-test/exclude-images (live-test/images)  tomcat-6-unsupported)]
+   (live-test/test-nodes
+    [compute node-map node-types]
+    {:tomcatssl
+     {:image image
+      :count 1
+      :phases {:bootstrap (phase/phase-fn
+                           (package/package-manager :update)
+                           (automated-admin-user/automated-admin-user))
+               :settings (phase/phase-fn
+                          (tomcat/tomcat-settings
+                           {:server
+                            (tomcat/server
+                             (tomcat/engine "catalina" "host"
+                                     (tomcat/valve :request-dumper))
+                             (tomcat/service
+                              (tomcat/global-resources)
+                              (tomcat/connector
+                               :scheme "http"
+                               :port "8080" :protocol "HTTP/1.1"
+                               :connectionTimeout "20000"
+                               :redirectPort "8443")
+                              (tomcat/connector
+                               :scheme "https"
+                               :secure "true"
+                               :SSLEnabled "true"
+                               :keystoreFile keystore-file
+                               :keystorePass "changeit"
+                               :clientAuth "false"
+                               :sslProtocol "TLS"
+                               :port "8443" :protocol "HTTP/1.1"
+                               :connectionTimeout "20000")))}))
+               :configure (fn [session]
+                            (let [settings (get-target-settings
+                                            session :tomcat nil)
+                                  appdir (str (:webapps settings)
+                                              "pallet-live-test/")]
+                              (->
+                               session
+                               (ssl-keystore)
+                               (tomcat/install-tomcat)
+                               (tomcat/server-configuration)
+                               (tomcat/application-conf
+                                "pallet-live-test" application-config)
+                               (directory/directory appdir)
+                               (remote-file/remote-file
+                                (str appdir "index.jsp")
+                                :content index-html :literal true
+                                :flag-on-changed
+                                tomcat/tomcat-config-changed-flag)
+                               (tomcat/init-service
+                                :action :restart))))
+               :verify (phase/phase-fn
+                        (network-service/wait-for-http-status
+                         "https://localhost:8443/pallet-live-test/"
+                         200 :url-name "tomcat server"
+                         :insecure true
+                         ;; Use sslv3 to work around
+                         ;; https://bugs.launchpad.net/ubuntu/+source/openssl/+bug/861137
+                         :ssl-version 3)
+                        (exec-script/exec-checked-script
+                         "check tomcat is running with ssl"
+                         (pipe
+                          (wget
+                           "-O-"
+                           "--secure-protocol=SSLv3"
+                           "--no-check-certificate"
+                           "https://localhost:8443/pallet-live-test/")
+                          (grep -i (quoted "openjdk")))))}}}
+    (core/lift (:tomcatssl node-types) :phase :verify :compute compute))))
+
 (deftest live-sun-jdk-test
   (live-test/test-for
    [image (live-test/exclude-images (live-test/images)  tomcat-6-unsupported)]
@@ -470,9 +566,10 @@ swallowOutput=\"true\">
      {:image image
       :count 1
       :phases {:bootstrap (phase/phase-fn
+                           (package/package-manager :update)
                            (automated-admin-user/automated-admin-user))
                :settings (phase/phase-fn
-                          (java/java-settings {})
+                          (java/java-settings {:vendor :oracle})
                           (tomcat/tomcat-settings settings-map))
                :configure (fn [session]
                             (let [settings (get-target-settings
@@ -481,6 +578,7 @@ swallowOutput=\"true\">
                                               "pallet-live-test/")]
                               (->
                                session
+                               (package/package-manager :update)
                                (java/install-java)
                                (tomcat/install-tomcat)
                                (tomcat/server-configuration)
@@ -490,7 +588,8 @@ swallowOutput=\"true\">
                                (remote-file/remote-file
                                 (str appdir "index.jsp")
                                 :content index-html :literal true
-                                :flag-on-changed tomcat/tomcat-config-changed-flag)
+                                :flag-on-changed
+                                tomcat/tomcat-config-changed-flag)
                                (tomcat/init-service
                                 :if-config-changed true :action :restart))))
                :verify (phase/phase-fn
@@ -501,5 +600,5 @@ swallowOutput=\"true\">
                          "check tomcat is running with sun jdk"
                          (pipe
                           (wget "-O-" "http://localhost:8080/pallet-live-test/")
-                          (grep -i (quoted "sun")))))}}}
+                          (grep -i -e (quoted "sun") -e (quoted "oracle")))))}}}
     (core/lift (:tomcatsun node-types) :phase :verify :compute compute))))
