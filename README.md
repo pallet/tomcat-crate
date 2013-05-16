@@ -2,7 +2,7 @@
 
 This a crate to install and run tomcat via [Pallet](http://pallet.github.com/pallet).
 
-[Release Notes](https://github.com/pallet/tomcat-crate/blob/master/ReleaseNotes.md)
+[Release Notes](ReleaseNotes.md)
 
 ## Support
 
